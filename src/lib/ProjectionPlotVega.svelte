@@ -44,7 +44,7 @@
 				'y': scaledEmbedding[1],
 				'id': index,
 				'selected': selectedIDs.includes(index),
-				'Mean Entropy': embeddings[index].reduce((sum, value) => sum + value, 0) / embeddings[index].length
+				'mean': embeddings[index].reduce((sum, value) => sum + value, 0) / embeddings[index].length
 			}
 		});
 	}
@@ -253,6 +253,12 @@
 				domain: {signal: "ydom"},
 				range: {signal: "yrange"}
 			},
+			{
+				name: "color",
+				type: "sequential",
+				domain: {data: "table", field: "mean"},
+				range: {scheme: "blues"}
+			}
 		],
 		axes: [
 			{
@@ -281,9 +287,11 @@
 						size: {value: 5},
 						shape: {value: "circle"},
 						strokeWidth: {value: 2},
+						fill: {scale: "color", field: "mean"},
 						opacity: {value: 0.5},
-						stroke: {value: "#4682b4"},
-						fill: {value: "transparent"}
+						stroke: {scale: "color", field: "mean"},
+						// stroke: {value: "#4682b4"},
+						// fill: {value: "transparent"}
 					},
 				},
 			}
