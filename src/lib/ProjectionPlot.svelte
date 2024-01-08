@@ -69,7 +69,19 @@
 		width: width,
 		selection: {
 			selectedPoint: { type: 'single', fields: ['id'] },
-			brush: {type: "interval"}
+			brush: {
+				type: "interval",
+				resolve: "union",
+				on: "[mousedown[event.shiftKey], window:mouseup] > window:mousemove!",
+				translate: "[mousedown[event.shiftKey], window:mouseup] > window:mousemove!",
+				zoom: "null"
+			},
+			panzoom: {
+				type: "interval", 
+				bind: "scales",
+				translate: "[mousedown[!event.shiftKey], window:mouseup] > window:mousemove!",
+				zoom: "wheel!"
+			}
 		}
 	};
 
