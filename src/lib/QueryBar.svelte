@@ -99,7 +99,6 @@
         flex-direction: row;
         column-gap: 1em;
         align-items: start;
-        margin-bottom: 1em;
     }
 
     .query-dimension {
