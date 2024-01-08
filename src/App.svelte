@@ -1,17 +1,19 @@
 <script lang="ts">
   import {json} from "d3";
   import InstanceList from "./lib/InstanceList.svelte";
-  import ProjectionPlot from "./lib/ProjectionPlotVega.svelte";
+  import ProjectionPlot from "./lib/ProjectionPlot.svelte";
   import QueryBar from "./lib/QueryBar.svelte";
   import type { Embedding } from "./lib/types";
 
-  let selectedIDs = [0, 1, 2,];
   let datasetName = 'cifar';
+  let selectedIDs = [] as number[];
 
   let datasetLabels = [] as string[];
   let imageURLs = [] as string[];
   let imageLabels = [] as string[];
   let embeddings = [] as Embedding[];
+
+  $: selectedIDs = Array.from({length: embeddings.length}, (_, i) => i);
 
   function loadLabels() {
       json(`/data/${datasetName}/labels.json`).then((jsonObject: string[]) => {

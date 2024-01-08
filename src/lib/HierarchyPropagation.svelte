@@ -3,12 +3,17 @@
     import type { Node, Tree, Score, VisualizationAttributes } from "./types.ts";
     import * as d3 from 'd3';
     import type { HierarchyNode } from "d3-hierarchy";
+    import { onMount, createEventDispatcher } from "svelte";
 
     const colorScheme = d3.scaleOrdinal(d3.schemeSet1);
+    const dispatch = createEventDispatcher();
 
     export let instanceID = 0;
     export let datasetPath = "/data/cifar/";
+    export let threshold = 0.01; // threshold for filtering nodes
+    export let width = 500; // width of the SVG
 
+    // An uncertainty fingerprint is defined as a Tree and Scores
     let hierarchy = [] as Tree;
     let scores = {} as Score;
 
@@ -22,12 +27,6 @@
     }
 
     $: loadData();
-
-    // An uncertainty fingerprint is defined as a Tree and Scores
-    // export let scores = {}; // maps IDs to scores
-    // export let hierarchy = [] as Tree; // basic hierarchy structure (does not change)
-    export let threshold: number = 0.01; // threshold for filtering nodes
-    export let width: number = 500; // width of the SVG
     
     // Create a tree by propagating scores through the hierarchy and filtering
     let tree = [] as Tree; // scores propagated through the hierarchy
@@ -81,7 +80,9 @@
     $: baseLineX = (node: HierarchyNode<Node> | null) => node && node.parent ? lineOffsetX + scaleLine(visualizationAttributes[node.parent.data.id].x0) : lineOffsetX;
     $: sparkLineX = (node: HierarchyNode<Node>) => lineOffsetX + scaleLine(visualizationAttributes[node.data.id].x0);
 
-    function shortenName(name: string, maxChars=15) { 
+
+    function shortenName(name: string, maxChars=15) {
+        // Shortens the name to macChars characters plus '...'
         if (name.length > maxChars) {
             return name.substring(0, maxChars) + '...';
         };
@@ -143,7 +144,7 @@
     }
 
     function initializeVisualizationAttributes(root: HierarchyNode<Node>) {
-        // Initialize the visualization attributes for each node
+        // Initializes the visualization attributes for each node
         let visualizationAttributes = {} as VisualizationAttributes;
         if ( ! root || !root.data ) return visualizationAttributes;
         let stack = [root];
@@ -202,6 +203,7 @@
     }
 
     function recursiveVisibility(node: HierarchyNode<Node>, visible=true) {
+        // Recursively sets the visibility of the node and its children
         visualizationAttributes[node.data.id].isVisible = visible;
         let collapsed = visualizationAttributes[node.data.id].isCollapsed;
         let childVisible = visible && !collapsed;
@@ -211,6 +213,7 @@
     }
 
     function toggleCollapse(node: HierarchyNode<Node>) {
+        // Toggles the collapse state of the node
         // if node is collapsed, then expand it
         let collapse = ! visualizationAttributes[node.data.id].isCollapsed;
         visualizationAttributes[node.data.id].isCollapsed = collapse;
@@ -223,6 +226,7 @@
     }
 
     function reindex() {
+        // Updates the yIndex of each node based on its visibility
         let currentYIndex = 0;
         for (let i = 0; i < orderedNodes.length; i++) {
             visualizationAttributes[orderedNodes[i].data.id].yIndex = currentYIndex;
@@ -233,18 +237,23 @@
     }
 
     function findParent(node: HierarchyNode<Node>, depth: number) {
+        // Finds the parent of the node at the given depth
         if (node.depth === depth) return node;
         if (node.parent) return findParent(node.parent, depth);
-        return node; // TODO: switch this to throw an error
+        
+        // Raise an error if we get here
+        throw new Error(`Could not find parent of node ${node.data.id} at depth ${depth}`);
     }
 
     function isConnected(child: HierarchyNode<Node>, parent: HierarchyNode<Node>) {
+        // Checks whether the child is connected to the parent
         if (child.parent === parent) return true;
         if (child.parent) return isConnected(child.parent, parent);
         return false;
     }
 
     function color(node: HierarchyNode<Node>, root: HierarchyNode<Node>) {
+        // Returns the color of the node
         if (node.depth <= root.depth) return 'darkgrey';
         if (! isConnected(node, root)) return 'darkgrey';
         if (node && node.depth > root.depth + 1) {
@@ -252,6 +261,11 @@
         }
         const color = colorScheme(node.data.id);
         return color;
+    }
+
+    // Dispatch an event when the hierarchy is loaded
+    $: if (root.height > 0) {
+        dispatch('loaded');
     }
 
 </script>
