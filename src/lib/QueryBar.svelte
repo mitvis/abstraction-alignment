@@ -43,6 +43,18 @@
             return parseQuery(entropy.toString(), threshold);
 
         }
+        if (query.startsWith('>')) {
+            let subQuery = query.slice(1);
+            let queryNumber = parseFloat(subQuery);
+            let parser = (value: number): boolean => value > queryNumber;
+            return parser;
+        }
+        if (query.startsWith('<')) {
+            let subQuery = query.slice(1);
+            let queryNumber = parseFloat(subQuery);
+            let parser = (value: number): boolean => value < queryNumber;
+            return parser;
+        }
         throw new Error(`Invalid query: ${query}`);
     }
 
