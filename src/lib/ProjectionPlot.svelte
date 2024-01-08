@@ -11,7 +11,7 @@
     export let selectedIDs: number[];
 
 	let view: vega.View;
-	const width = 500;
+	const width = 475;
 	const height = 200;
 	const padding = 10;
 	let interpretable = true;
@@ -34,13 +34,13 @@
 	}
 
 	$: if (scaledEmbeddings.length > 0) {
-		data.table = scaledEmbeddings.map((scaledEmbedding, index) => {
+		data.table = scaledEmbeddings.map((scaledEmbedding, i) => {
 			return {
 				'x': scaledEmbedding[0],
 				'y': scaledEmbedding[1],
-				'id': index,
-				'selected': selectedIDs.includes(index),
-				'mean': embeddings[index].reduce((sum, value) => sum + value, 0) / embeddings[index].length
+				'id': i,
+				'selected': selectedIDs.includes(i),
+				'drop-off': (embeddings[i][0] - embeddings[i][embeddings[i].length - 1]) / embeddings[i][0], 
 			}
 		});
 	}
@@ -55,7 +55,7 @@
 			x: { field: 'x', type: 'quantitative', title: xLabel},
 			y: { field: 'y', type: 'quantitative', title: yLabel},
 			tooltip: { field: 'id', type: 'nominal' },
-			color: {field: "mean", type: "quantitative"},
+			color: {field: "drop-off", type: "quantitative"},
 			opacity: {
 				condition: { test: 'datum.selected', value: 1 },
 				value: 0.05
