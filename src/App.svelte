@@ -1,6 +1,7 @@
 <script lang="ts">
   import {json} from "d3";
   import InstanceList from "./lib/InstanceList.svelte";
+  import Filter from "./lib/Filter.svelte";
   import ProjectionPlot from "./lib/ProjectionPlot.svelte";
   import QueryBar from "./lib/QueryBar.svelte";
   import type { Embedding } from "./lib/types";
@@ -43,9 +44,16 @@
       <p>Selected {selectedIDs.length} of {datasetLabels.length} instances</p>
       <InstanceList instanceIDs={selectedIDs} imageLabels={imageLabels} imageURLs={imageURLs}/>
     </div>
-    <div id='embeddings'>
-      <QueryBar embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
-      <ProjectionPlot embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
+    <div id='content'>
+      <div id=instances>
+        <p>Selected {selectedIDs.length} of {datasetLabels.length} instances</p>
+        <InstanceList instanceIDs={selectedIDs} imageLabels={imageLabels} imageURLs={imageURLs}/>
+      </div>
+      <div id='embeddings'>
+        <QueryBar embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
+        <Filter labels={datasetLabels} bind:selectedIDs={selectedIDs}/>
+        <ProjectionPlot embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
+      </div>
     </div>
   </div>
 </main>
