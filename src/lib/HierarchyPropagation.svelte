@@ -17,7 +17,7 @@
     let hierarchy = [] as Tree;
     let scores = {} as Score;
 
-    function loadData() {
+    function loadData(instanceID: number) {
         d3.json(`${datasetPath}/hierarchy.json`).then((jsonObject: Tree) => {
             hierarchy = jsonObject;
         });
@@ -26,7 +26,7 @@
         });
     }
 
-    $: loadData();
+    $: loadData(instanceID);
     
     // Create a tree by propagating scores through the hierarchy and filtering
     let tree = [] as Tree; // scores propagated through the hierarchy

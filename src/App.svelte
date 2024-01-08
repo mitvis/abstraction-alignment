@@ -30,7 +30,7 @@
 
   function loadEmbeddings() {
     json(`/data/${datasetName}/embeddings.json`).then((jsonObject: Embedding[]) => {
-      embeddings = jsonObject;
+      embeddings = jsonObject.map(embedding => embedding.map(value => parseFloat(value.toFixed(2))));
       selectedIDs = Array.from({length: embeddings.length}, (_, i) => i);
     })
   }
@@ -44,7 +44,7 @@
       <InstanceList instanceIDs={selectedIDs} imageLabels={imageLabels} imageURLs={imageURLs}/>
     </div>
     <div id='embeddings'>
-      <QueryBar dimensions={embeddings[0] ? embeddings[0].length : 0}/>
+      <QueryBar embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
       <ProjectionPlot embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
     </div>
   </div>
