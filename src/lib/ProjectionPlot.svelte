@@ -11,7 +11,7 @@
     export let selectedIDs: number[];
 
 	let view: vega.View;
-	const width = 425;
+	const width = 500;
 	const height = 200;
 	const padding = 10;
 	let interpretable = true;
@@ -91,7 +91,7 @@
 		
 
 	onMount(async () => {
-		const result = await vegaEmbed('#projection-plot', spec);
+		const result = await vegaEmbed('#projection-plot', spec, {actions: false});
 		view = result.view;
 
 		view.addSignalListener('selectedPoint', async function(_, value) {
