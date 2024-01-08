@@ -13,8 +13,6 @@
   let imageLabels = [] as string[];
   let embeddings = [] as Embedding[];
 
-  $: selectedIDs = Array.from({length: embeddings.length}, (_, i) => i);
-
   function loadLabels() {
       json(`/data/${datasetName}/labels.json`).then((jsonObject: string[]) => {
           datasetLabels = jsonObject;
@@ -33,6 +31,7 @@
   function loadEmbeddings() {
     json(`/data/${datasetName}/embeddings.json`).then((jsonObject: Embedding[]) => {
       embeddings = jsonObject;
+      selectedIDs = Array.from({length: embeddings.length}, (_, i) => i);
     })
   }
   $: loadEmbeddings();
@@ -64,6 +63,7 @@
       flex-direction: column;
       align-items: flex-start;
       height: 90vh;
+      width: 50vw;
   }
 
   p {

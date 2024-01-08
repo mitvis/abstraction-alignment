@@ -1,6 +1,6 @@
 <!-- A Svelte component that takes in a JSON file of vectors and visualizes them as a 2D scatterplot.--> 
 <script lang='ts'>
-	import { onMount, afterUpdate } from 'svelte';
+	import { onMount } from 'svelte';
 	import { UMAP } from 'umap-js';
 	import type { EmbeddingPoint } from './types';
 	import type { VisualizationSpec } from "svelte-vega";
@@ -8,7 +8,7 @@
 	import * as vega from 'vega';
 
 	export let embeddings = [] as number[][];
-    export let selectedIDs = [] as number[];
+    export let selectedIDs: number[];
 
 	let view: vega.View;
 	const width = 425;
@@ -72,32 +72,41 @@
 			brush: {type: "interval"}
 		}
 	};
+
+	function defaultSelectedIDs() {
+		return Array.from({length: data.table.length}, (_, i) => i);
+	};
 		
 
 	onMount(async () => {
-		console.log('onMount')
 		const result = await vegaEmbed('#projection-plot', spec);
 		view = result.view;
 
-		view.addSignalListener('selectedPoint', function(_, value) {
-            if (value) {
-				if (selectedIDs.length == data.table.length) { // everything is selected
-					selectedIDs = [value.id[0]];
-				} else { // a subset is selected
-					if (selectedIDs.includes(value.id[0])) {
-						selectedIDs = selectedIDs.filter(id => id != value.id[0]);
-					} else {
-						selectedIDs = [...selectedIDs, value.id[0]];
+		view.addSignalListener('selectedPoint', async function(_, value) {
+			if (Object.keys(value).length === 0) {
+				selectedIDs = defaultSelectedIDs();
+			} else {
+				if (value) {
+					if (selectedIDs.length == data.table.length) { // everything is selected
+						selectedIDs = [value.id[0]];
+					} else { // a subset is selected
+						if (selectedIDs.includes(value.id[0])) {
+							if (selectedIDs.length == 1) { // clicked point is the only thing selected
+								selectedIDs = defaultSelectedIDs();
+							} else {
+								selectedIDs = selectedIDs.filter(id => id != value.id[0]);
+							};
+						} else {
+							selectedIDs = [...selectedIDs, value.id[0]];
+						}
 					}
 				}
-				console.log(selectedIDs)
-				selectedIDs = selectedIDs;
-            }
+			}
         });
 
 		view.addSignalListener('brush', function(_, value) {
 			if (Object.keys(value).length === 0) {
-				selectedIDs = [];
+				selectedIDs = defaultSelectedIDs();
 			} else {
 				if (value) {
 					// Get the extents of the brush selection
@@ -113,7 +122,11 @@
 					let selectedPointIDs = selectedPoints.map(d => d.id);
 
 					// Add the selected point IDs to selectedIDs
-					selectedIDs = [...selectedPointIDs];
+					if (selectedPointIDs.length == 0) {
+						selectedIDs = defaultSelectedIDs();
+					} else {
+						selectedIDs = [...selectedPointIDs];
+					}
 				}
 			}
 		});
