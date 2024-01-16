@@ -1,8 +1,12 @@
 <script lang='ts'>
-    export let selectedIDs: number[];
-    export let embeddings: number[][];
+    import {computeEntropy} from './hierarchyUtils';
+    import type { HierarchyNode } from "d3-hierarchy";
+    import type { Node } from "./types";
 
-    $: dimensions = embeddings.length > 0 ? embeddings[0].length : 0;
+    export let selectedIDs: number[];
+    export let trees: HierarchyNode<Node>[];
+
+    $: dimensions = trees && trees.length > 0 ? trees[0].height + 1: 0;
 
     let queryVector: string[];
     $: queryVector = Array.from({length: dimensions}, () => '*');
@@ -10,71 +14,70 @@
     let thresholds: number[];
     $: thresholds = Array.from({length: dimensions}, () => 0);
 
-    function computeEntropy(probabilities: number[]) {
-        let entropy = probabilities.reduce((entropy, probability) => {
-            if (probability > 0) {
-                return entropy - probability * Math.log(probability);
-            } else {
-                return entropy;
-            }
-        }, 0);
-        return entropy;
-    }
+    function euclideanDistance(vector1: number[], vector2: number[]): number {
+        let sum = 0;
+        for (let i = 0; i < vector1.length; i++) {
+            sum += Math.pow(vector1[i] - vector2[i], 2);
+        }
+        return Math.sqrt(sum);
+    };
 
     function parseQuery(query: string, threshold: number) {
-        if (query === '*') { 
-            let parser = (value: number): boolean => true;
-            return parser;
-        }
-        if (!isNaN(parseFloat(query))) {
-            let queryNumber = parseFloat(query);
-            let parser = (value: number): boolean => value >= queryNumber - threshold && value <= queryNumber + threshold;
-            return parser;
-        }
-        if (query.startsWith('not')) {
-            let subQuery = query.slice(4, -1) // remove the not and brackets
-            let parser = (value: number): boolean => ! parseQuery(subQuery, threshold)(value);
-            return parser;
-        }
-        if (query.startsWith('E')) {
-            let subQuery = query.slice(2, -1) // remove the entropy and brackets
-            let probabilities = subQuery.split(',').map(value => parseFloat(value));
-            let entropy = computeEntropy(probabilities);
-            return parseQuery(entropy.toString(), threshold);
-
-        }
-        if (query.startsWith('>')) {
-            let subQuery = query.slice(1);
-            let queryNumber = parseFloat(subQuery);
-            let parser = (value: number): boolean => value > queryNumber;
-            return parser;
-        }
-        if (query.startsWith('<')) {
-            let subQuery = query.slice(1);
-            let queryNumber = parseFloat(subQuery);
-            let parser = (value: number): boolean => value < queryNumber;
-            return parser;
-        }
-        throw new Error(`Invalid query: ${query}`);
-    }
-
-    function query() {
-        // filter embeddings so that selectedIDs only contains the IDs of the embeddings that match the query vector
-        selectedIDs = embeddings
-            .map((embedding, index) => {
-                return {
-                    embedding: embedding,
-                    index: index
+        let parser = (level: number[]): boolean => true;
+        if (query.startsWith('!')) {
+            let childParser = parseQuery(query.slice(1), threshold);
+            parser = (level: number[]): boolean => {
+                return ! childParser(level);
+            }
+        } else if (query.startsWith('[') && query.endsWith(']')) {
+            query = query.slice(1, -1); // remove the brackets
+            let queryValues = query.split(',').map(value => parseFloat(value));
+            parser = (level: number[]): boolean => {
+                let sortedLevelValues = level.sort((a, b) => a - b);
+                let sortedQueryValues = queryValues.sort((a, b) => a - b);
+                if (sortedQueryValues.length < sortedLevelValues.length) {
+                    sortedQueryValues = [
+                        ...sortedQueryValues, 
+                        ...new Array(sortedLevelValues.length - sortedQueryValues.length).fill(0)
+                    ];
                 }
-            })
+                return euclideanDistance(sortedLevelValues, sortedQueryValues) <= threshold;
+            };
+        } else if (!isNaN(parseInt(query))) {
+            parser = (level: number[]): boolean => {
+                return level.length === parseInt(query);
+            };
+        };
+        return parser
+    };
+
+    function query(queryVector: string[]) {
+        selectedIDs = trees
+            .map((root, index) => {return {root: root, index: index}})
             .filter(object => {
-                return object.embedding.every((value, i) => {
-                    let parser = parseQuery(queryVector[i], thresholds[i]);
-                    return parser(value);
-                })
+                let levelNodes: number[][] = [];
+                for (let level = 0; level <= object.root.height; level++) {
+                    let levelValues: number[] = object.root.descendants()
+                        .filter(node => node.depth === level)
+                        .map(node => node.data.value);
+                    if ( level > 0 && levelNodes[level-1].length  > levelValues.length ) {
+                        const extraZeros = new Array(levelNodes[level-1].length - levelValues.length).fill(0);
+                        levelValues = [...levelValues, ...extraZeros];
+                    };
+                    levelNodes.push(levelValues);
+                };
+                for (let level = 0; level <= object.root.height; level++) {
+                    let parser = parseQuery(queryVector[level], thresholds[level]);
+                    if (!parser(levelNodes[level])) {
+                        return false;
+                    }
+                }
+                return true;
             })
-            .map(embedding => embedding.index);
+            .map(object => object.index);
     }
+
+    $: query(queryVector);
 </script>
 
 <div id='query-vector'>
@@ -83,14 +86,21 @@
     <div class='vector'>
         {#each queryVector as value, i}
             <div class='query'>
-                <span>Level {i}</span>
+                {#if i === 0}
+                    <span>Level {i} (Root)</span>
+                {:else if i === queryVector.length - 1}
+                    <span>Level {i} (Leaves)</span>
+                {:else}
+                    <span>Level {i}</span>
+                {/if}
                 <input class='query-dimension' bind:value={queryVector[i]} />
-                <input type='range' bind:value={thresholds[i]} min=0 max=1 step=0.05/>
+                <input type='range' bind:value={thresholds[i]} min=0 max=0.5 step=0.01/>
                 <span>{thresholds[i]}</span>
             </div>
         {/each}
     </div>
-    <button id='query-button' on:click={query}>Query</button>
+    <!-- <button id='query-button' on:click={query(queryVector)}>Query</button> -->
+    <button id='query-button' on:click={() => queryVector = queryVector.map(_ => '*')}>Clear</button>
 </div>
 
 <style>
