@@ -50,7 +50,7 @@
 		data: {
 			name: 'table'
 		},
-		mark: 'point',
+		mark: 'circle',
 		encoding: {
 			x: { field: 'x', type: 'quantitative', title: xLabel},
 			y: { field: 'y', type: 'quantitative', title: yLabel},
@@ -68,7 +68,11 @@
 		height: height,
 		width: width,
 		selection: {
-			selectedPoint: { type: 'single', fields: ['id'] },
+			selectedPoint: { 
+				type: 'single', 
+				fields: ['id'],
+				on: "mousedown[!event.metaKey]"
+			},
 			brush: {
 				type: "interval",
 				resolve: "union",
@@ -79,7 +83,7 @@
 			panzoom: {
 				type: "interval", 
 				bind: "scales",
-				translate: "[mousedown[!event.shiftKey], window:mouseup] > window:mousemove!",
+				translate: "[mousedown[event.metaKey], window:mouseup] > window:mousemove!",
 				zoom: "wheel!"
 			}
 		}
