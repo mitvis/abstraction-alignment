@@ -31,3 +31,10 @@ export type EmbeddingPoint = {
     y: number,
     id: number,
 }
+
+export type Filter = {
+    object: string,
+    attribute: string,
+    operator: string,
+    value: number | string
+}
