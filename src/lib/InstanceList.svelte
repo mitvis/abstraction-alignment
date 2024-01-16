@@ -1,13 +1,13 @@
 <!-- List of instances -->
 <script lang='ts'>
-    import { afterUpdate } from 'svelte';
-    import ImageInstance from "./ImageInstance.svelte";
+    import Instance from "./Instance.svelte";
     import HierarchyPropagation from "./HierarchyPropagation.svelte";
     import IntersectionObserver from "./IntersectionObserver.svelte";
 
     export let instanceIDs = [] as number[];
-    export let imageURLs = [] as string[];
-    export let imageLabels = [] as string[];
+    export let instances = [] as string[];
+    export let instanceLabels = [] as string[][];
+    export let instanceType = null as string | null;
 
     // Update the height of the instance container when the hierarchy loads
     let instanceContainers: any[] = [];
@@ -25,8 +25,8 @@
             <IntersectionObserver once={true} let:intersecting={intersecting}>
                 {#if intersecting}
                     <div class='instance'>
-                        <ImageInstance instanceID={id} imageLabel={imageLabels[i]} imageURL={imageURLs[i]}/>
                         <HierarchyPropagation instanceID={id} on:loaded={() => updateHeight(i)}/>
+                        <Instance ID={id} labels={instanceLabels[i]} instance={instances[i]} type={instanceType}/>
                     </div>
                 {/if}
             </IntersectionObserver>
