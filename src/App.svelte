@@ -1,67 +1,130 @@
 <script lang="ts">
-  import {json} from "d3";
-  import InstanceList from "./lib/InstanceList.svelte";
-  import Filter from "./lib/Filter.svelte";
-  import ProjectionPlot from "./lib/ProjectionPlot.svelte";
-  import QueryBar from "./lib/QueryBar.svelte";
-  import type { Embedding } from "./lib/types";
-  
+    import {json} from "d3";
+    import InstanceList from "./lib/InstanceList.svelte";
+    import Filter from "./lib/Filter.svelte";
+    import ProjectionPlot from "./lib/ProjectionPlot.svelte";
+    import QueryBar from "./lib/QueryBar.svelte";
+    import type { Embedding, Node, Score } from "./lib/types";
+    import ConfusionList from "./lib/ConfusionList.svelte";
+    import {onMount} from "svelte";
+    import SearchBar from "./lib/SearchBar.svelte";
+    import type { HierarchyNode } from "d3-hierarchy";
+    import { createHierarchy, extractD3HierarchyRoot } from "./lib/hierarchyUtils";
 
-  const datasets = ['cifar', 'mimic'];
-  let datasetName = 'cifar';
-  let selectedIDs = [] as number[];
+    type Dataset = {
+        name: string,
+        type: string | null,
+        threshold: number
+    };
 
-  let datasetLabels = [] as string[];
-  let imageURLs = [] as string[];
-  let imageLabels = [] as string[];
-  let embeddings = [] as Embedding[];
+    const datasets: Dataset[] = [
+        {name: 'cifar', type: 'image', threshold: 0.01},
+        {name: 'mimic', type: null, threshold: 0.1},
+    ];
+    let dataset = datasets[0];
 
-  function loadLabels(datasetName: string) {
-      json(`/data/${datasetName}/labels.json`).then((jsonObject: string[]) => {
-          datasetLabels = jsonObject;
-      });
-  }
-  $: loadLabels(datasetName);
+    
+    let datasetLabels = [] as string[][];
+    let embeddings = [] as Embedding[];
+    let hierarchy = [] as Node[];
+    let scores = [] as Score[];
+    let predictions = [] as string[][];
+    let jointEntropy = new Map<string, number>();
+    let trees = [] as HierarchyNode<Node>[];
+    let levelIDMap = new Map<number, number>();
 
-  function getImageURL(instanceID: number, datasetName: string) {
-    const index = instanceID.toString().padStart(5, "0");
-    return `/data/${datasetName}/images/${datasetName}_test_${index}.jpg`
-  }
-  $: imageURLs = selectedIDs.map(id => getImageURL(id, datasetName));
-  $: imageLabels = selectedIDs.map(id => datasetLabels ? datasetLabels[id] : "");
+    let selectedIDs = [] as number[];
+    let instances = [] as string[];
+    let instanceLabels = [] as string[][];
+
+    function loadDataset(dataset: Dataset) {
+        let labelsPromise = json(`/data/${dataset.name}/labels.json`);
+        let embeddingsPromise = json(`/data/${dataset.name}/embeddings.json`);
+        let hiearchyPromise = json(`/data/${dataset.name}/hierarchy.json`);
+        let scoresPromise = json(`/data/${dataset.name}/scores.json`);
+        let jointEntropyPromise = json(`/data/${dataset.name}/joint_entropy.json`);
+        Promise.all([labelsPromise, embeddingsPromise, hiearchyPromise, scoresPromise, jointEntropyPromise])
+        .then(([labelsJson, embeddingsJson, hierarchyJson, scoresJson, jointEntropyJson]) => {
+            datasetLabels = labelsJson;
+            embeddings = embeddingsJson;
+            selectedIDs = Array.from({length: embeddings.length}, (_, i) => i);
+            hierarchy = hierarchyJson;
+            let nodeIDToName = new Map(hierarchy.map(node => [node.id, node.name]));
+            scores = scoresJson;
+            predictions = scores
+                .map((score: Score) => [nodeIDToName.get(
+                    parseInt(
+                        Array.from(Object.entries(score))
+                            .reduce((scoreA, scoreB) => scoreB[1] > scoreA[1] ? scoreB : scoreA)[0]
+                    )
+                )]);
+            jointEntropy = new Map(Object.entries(jointEntropyJson));
+            trees = scores.map(score => createHierarchy(hierarchy, score, dataset.threshold));
+            
+            let hierarchyD3: HierarchyNode<Node>[] = extractD3HierarchyRoot(hierarchy).descendants();
+            hierarchyD3.sort((a, b) => a.data.name.localeCompare(b.data.name)).sort((a, b) => a.depth - b.depth);
+            levelIDMap = new Map(hierarchyD3.map((node, index) => [node.data.id, index]));
+       });
+    };
+
+    function loadInstances(selectedIDs: number[], dataset: Dataset) {
+        if (dataset.type == 'image') {
+            instances = selectedIDs.map(id => getImageURL(id, dataset));
+        } else {
+            instances = selectedIDs.map(id => id.toString());
+        };
+        instanceLabels = selectedIDs.map(id => datasetLabels ? datasetLabels[id] : []);
+    }
+
+    function getImageURL(instanceID: number, dataset: Dataset) {
+        const index = instanceID.toString().padStart(5, "0");
+        return `/data/${dataset.name}/images/${dataset.name}_test_${index}.jpg`
+    }
+
+    $: loadDataset(dataset);
+    $: loadInstances(selectedIDs, dataset);
 
 
-  function loadEmbeddings(datasetName: string) {
-    json(`/data/${datasetName}/embeddings.json`).then((jsonObject: Embedding[]) => {
-      embeddings = jsonObject.map(embedding => embedding.map(value => parseFloat(value.toFixed(2))));
-      selectedIDs = Array.from({length: embeddings.length}, (_, i) => i);
-    })
-  }
-  $: loadEmbeddings(datasetName);
 </script>
 
 <main>
-  <div id='main'>
-    <div id='dataset'>
-      <p>Dataset: </p>
-      {#each datasets as dataset}
-        <button class:active={datasetName == dataset} on:click={() => datasetName = dataset}>
-          {dataset}
-        </button>
-      {/each}
+    {#if trees.length > 0}
+    <div id='main'>
+        <div id='dataset'>
+        <p>Dataset: </p>
+        {#each datasets as d}
+            <button class:active={dataset.name == d.name} on:click={() => dataset = d}>
+            {d.name}
+            </button>
+        {/each}
+        </div>
+        <div id='content'>
+        <div id=instances>
+            <p>
+                Selected {selectedIDs.length} of {datasetLabels.length} instances 
+                ({(selectedIDs.length / datasetLabels.length * 100).toFixed(1)}%)
+            </p>
+            <InstanceList
+                instanceIDs={selectedIDs} 
+                instanceLabels={instanceLabels} 
+                instances={instances} 
+                instanceType={dataset.type}
+                hierarchy={hierarchy}
+                scores={scores}
+                trees={trees}
+                levelIDMap={levelIDMap}
+            />
+        </div>
+        <div id='embeddings'>
+            <SearchBar bind:selectedIDs={selectedIDs}/>
+            <QueryBar trees={trees} bind:selectedIDs={selectedIDs}/>
+            <Filter labels={datasetLabels} predictions={predictions} bind:selectedIDs={selectedIDs}/>
+            <ProjectionPlot embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
+            <ConfusionList jointEntropy={jointEntropy} hierarchy={hierarchy}/>
+        </div>
+        </div>
     </div>
-    <div id='content'>
-      <div id=instances>
-        <p>Selected {selectedIDs.length} of {datasetLabels.length} instances</p>
-        <InstanceList instanceIDs={selectedIDs} imageLabels={imageLabels} imageURLs={imageURLs}/>
-      </div>
-      <div id='embeddings'>
-        <QueryBar embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
-        <Filter labels={datasetLabels} bind:selectedIDs={selectedIDs}/>
-        <ProjectionPlot embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
-      </div>
-    </div>
-  </div>
+    {/if}
 </main>
 
 <style>
@@ -106,7 +169,4 @@
     row-gap: 1em;
   }
 
-  .active {
-        background-color: #ddd;
-    }
 </style>

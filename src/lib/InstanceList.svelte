@@ -3,11 +3,17 @@
     import Instance from "./Instance.svelte";
     import HierarchyPropagation from "./HierarchyPropagation.svelte";
     import IntersectionObserver from "./IntersectionObserver.svelte";
+    import type { Node, Score } from "./types";
+    import type { HierarchyNode } from "d3-hierarchy";
 
     export let instanceIDs = [] as number[];
     export let instances = [] as string[];
     export let instanceLabels = [] as string[][];
     export let instanceType = null as string | null;
+    export let hierarchy = [] as Node[];
+    export let scores = [] as Score[];
+    export let trees = [] as HierarchyNode<Node>[];
+    export let levelIDMap = new Map<number, number>();
 
     // Update the height of the instance container when the hierarchy loads
     let instanceContainers: any[] = [];
@@ -25,8 +31,14 @@
             <IntersectionObserver once={true} let:intersecting={intersecting}>
                 {#if intersecting}
                     <div class='instance'>
-                        <HierarchyPropagation instanceID={id} on:loaded={() => updateHeight(i)}/>
                         <Instance ID={id} labels={instanceLabels[i]} instance={instances[i]} type={instanceType}/>
+                        <HierarchyPropagation 
+                            hierarchy={hierarchy}
+                            scores={scores[id]}
+                            root={trees[id]}
+                            levelIDMap={levelIDMap}
+                            on:loaded={() => {updateHeight(i)}}
+                        />
                     </div>
                 {/if}
             </IntersectionObserver>

@@ -60,6 +60,10 @@ button:hover {
   background-color: #0000001a;
 }
 
+.active {
+  background-color: #ddd;
+}
+
 /* @media (prefers-color-scheme: dark) {
   :root {
     color: rgba(255, 255, 255, 0.87);
