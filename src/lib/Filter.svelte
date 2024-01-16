@@ -1,19 +1,33 @@
 <script lang='ts'>
     export let selectedIDs: number[];
-    export let labels: string[];
+    export let labels: string[][];
+    export let predictions: string[][];
 
     let selectedLabel: string;
 
-    $: uniqueLabels = Array.from(new Set(labels)).sort();
-    $: selectionOptions = ['all', ...uniqueLabels];
+    $: uniqueLabels = Array.from(new Set(labels.flat())).sort();
+    $: selectionOptions = ['all', 'correct', 'incorrect', ...uniqueLabels];
     $: selectedLabel = 'all';
+
+    function arraysSame(arr1: string[], arr2: string[]) {
+        return arr1.length === arr2.length && arr1.sort().every((value, index) => value === arr2.sort()[index]);
+    }
     
     function filter() {
         // filter embeddings so that selectedIDs only contains the IDs of the embeddings that match the query vector
-        selectedIDs = labels.map((label, i) => {
-            return {'label': label, 'index': i}
-        }).filter(item => selectedLabel == selectionOptions[0] || item.label == selectedLabel).map(item => item.index)
+        selectedIDs = selectedIDs
+            .map((i) => {
+                return {'labels': labels[i], 'index': i}
+            })
+            .filter(item => 
+                selectedLabel == selectionOptions[0] || 
+                item.labels.includes(selectedLabel) || 
+                selectedLabel === 'correct' && arraysSame(item.labels, predictions[item.index]) ||
+                selectedLabel === 'incorrect' && !arraysSame(item.labels, predictions[item.index])
+            )
+            .map(item => item.index)
     }
+
 </script>
 
 <div id='filter'>
