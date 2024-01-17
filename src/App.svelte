@@ -125,7 +125,12 @@
             <QueryBar trees={trees} bind:selectedIDs={selectedIDs}/>
             <Filter labels={datasetLabels} predictions={predictions} bind:selectedIDs={selectedIDs}/>
             <ProjectionPlot embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
-            <ConfusionList jointEntropy={jointEntropy} hierarchy={hierarchy} colorMap={colorMap}/>
+            <ConfusionList 
+                jointEntropy={jointEntropy} 
+                hierarchy={hierarchy} 
+                colorMap={colorMap}
+                numInstances={datasetLabels.length}
+            />
         </div>
         </div>
     </div>

@@ -4,19 +4,22 @@
     import type { Score, Node, Filter } from './types';
     import * as d3 from 'd3';
     import type { HierarchyNode } from "d3-hierarchy";
-    import { isConnected, shortenName } from './hierarchyUtils';
+    import { isConnected, shortenName, computeEntropy } from './hierarchyUtils';
     import FilterBar from './FilterBar.svelte';
 
     export let numConfusions: number = 50;
     export let jointEntropy = new Map<string, number>();
     export let hierarchy = [] as Node[];
     export let colorMap = new Map<number, string>();
+    export let numInstances: number = 0;
+    $: max2DEntropy = computeEntropy([0.5,0.5]) * numInstances;
 
     let root: HierarchyNode<Node>;
     let nodes: [number, number][] = [];
     let selectedNodes: [number, number][] = [];
     let idToNode = new Map<number, HierarchyNode<Node>>();
-    let maxStringChars = 13;
+
+    const maxStringChars = 18;
     
     let filters: Filter[] = [];
 
@@ -138,6 +141,13 @@
         }
     }
 
+    function parseEntropy(pair: [number, number]) {
+        const [id1, id2] = pair;
+        const entropy = getItem(id1 + ',' + id2, jointEntropy);
+        const percentEntropy = entropy / max2DEntropy;
+        return percentEntropy.toFixed(2);
+    }
+
 </script>
 
 <div id='confusions'>
@@ -156,7 +166,7 @@
                     <span style='background-color:{colorMap.get(pair[1])}'>
                         {shortenName(getItem(pair[1], idToNode).data.name, maxStringChars)}
                     </span>
-                    <span style='width: 2.5em;'>{getItem(pair[0] + ',' + pair[1], jointEntropy).toFixed(0)}</span>
+                    <span style='width: 2.5em;'>{parseEntropy(pair)}</span>
                 </div>
             {/each}
         {/if}
@@ -192,6 +202,7 @@
         display: flex;
         flex-direction: row;
         align-items: flex-start;
+        column-gap: 1px;
     }
 
     .confusion-result > span {
@@ -200,7 +211,7 @@
         background-color: lightgrey;
         margin: 0;
         white-space: nowrap;
-        width: 8em;
+        width: 10.5em;
         font-family: Roboto-Mono, monospace;
         /* font-weight: 700; */
     }
