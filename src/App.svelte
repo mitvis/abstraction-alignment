@@ -34,10 +34,13 @@
     let jointEntropy = new Map<string, number>();
     let trees = [] as HierarchyNode<Node>[];
     let colorMap = new Map<number, string>();
+    let numCorrect: number;
 
     let selectedIDs = [] as number[];
     let instances = [] as string[];
     let instanceLabels = [] as string[][];
+
+    $: selectedNumCorrect = selectedIDs.filter(id => isCorrect(predictions[id], datasetLabels[id])).length;
 
     function loadDataset(dataset: Dataset) {
         let labelsPromise = json(`/data/${dataset.name}/labels.json`);
@@ -60,6 +63,7 @@
                             .reduce((scoreA, scoreB) => scoreB[1] > scoreA[1] ? scoreB : scoreA)[0]
                     )
                 )]);
+            numCorrect = predictions.filter((prediction, index) => isCorrect(prediction, datasetLabels[index])).length;
             jointEntropy = new Map(Object.entries(jointEntropyJson));
             trees = scores.map(score => createHierarchy(hierarchy, score, dataset.threshold));
             
@@ -71,6 +75,10 @@
     
        });
     };
+
+    function isCorrect(prediction: string[], label: string[]) {
+        return prediction.length === label.length && prediction.sort().every((value, index) => value === label.sort()[index]);
+    }
 
     function loadInstances(selectedIDs: number[], dataset: Dataset) {
         if (dataset.type == 'image') {
@@ -89,7 +97,6 @@
     $: loadDataset(dataset);
     $: loadInstances(selectedIDs, dataset);
 
-
 </script>
 
 <main>
@@ -107,7 +114,9 @@
         <div id=instances>
             <p>
                 Selected {selectedIDs.length} of {datasetLabels.length} instances 
-                ({(selectedIDs.length / datasetLabels.length * 100).toFixed(1)}%)
+                ({(selectedIDs.length / datasetLabels.length * 100).toFixed(1)}% total 
+                {(selectedNumCorrect / numCorrect * 100).toFixed(1)}% correct
+                {((selectedIDs.length - selectedNumCorrect) / (datasetLabels.length - numCorrect) * 100).toFixed(1)}% incorrect)
             </p>
             <InstanceList
                 instanceIDs={selectedIDs} 
