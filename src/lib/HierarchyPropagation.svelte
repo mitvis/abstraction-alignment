@@ -66,12 +66,6 @@
     $: scaleLine = d3.scaleLinear().domain([0, 1]).range([0, totalLineWidth]);
     $: lineOffsetX = 7 * padding + labelWidth;
 
-
-    function shortenName(name: string, maxChars: number = (maxStringChars - 4)) {
-        name = name.replace('_', ' ');
-        return name.length > maxChars ? name.substring(0, maxChars) + '...' : name;
-    }
-
     /** Creates the visualization attributes for each node */
     function initializeVisualizationAttributes(root: HierarchyNode<Node>) {
         let visAttributes = {} as VisualizationAttributes;
@@ -195,7 +189,7 @@
                             {/if}
                         {/if}
                         <text x={textX(node)} y={textY(node)} font-family='Roboto Mono, monospace'>
-                            {shortenName(node.data.name)}
+                            {shortenName(node.data.name, maxStringChars)}
                         </text>
                         <text x={labelWidth} y={textY(node)} font-family='Roboto Mono, monospace'>
                             {node.data.value ? node.data.value.toFixed(2).toString() : ''}

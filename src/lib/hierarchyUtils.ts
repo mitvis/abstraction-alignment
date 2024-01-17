@@ -225,3 +225,11 @@ export function getNodesAtDepth(root: HierarchyNode<Node>, depth: number) {
     const nodes = depthFirstItemization(root);
     return nodes.filter(node => node.depth === depth);
 }
+
+
+export function shortenName(name: string, maxChars: number | null = null) {
+    name = name.replace(/_/g, ' ');
+    if (maxChars === null) return name;
+    maxChars = maxChars - 4;
+    return name.length > maxChars ? name.substring(0, maxChars) + '...' : name;
+}
