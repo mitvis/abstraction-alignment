@@ -157,7 +157,7 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      height: 90vh;
+      height: 80vh;
       width: 630px;
   }
 
@@ -172,6 +172,7 @@
     flex-direction: column;
     align-items: start;
     row-gap: 1em;
+    height: 80vh;
   }
 
 </style>
