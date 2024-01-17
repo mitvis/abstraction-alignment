@@ -82,7 +82,7 @@
 
 <div id='query-vector'>
     <!-- create an input value for each {#each queryVector} -->
-    <p>Query vector:</p>
+    <p>Query:</p>
     <div class='vector'>
         {#each queryVector as value, i}
             <div class='query'>
