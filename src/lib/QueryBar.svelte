@@ -13,6 +13,7 @@
 
     let thresholds: number[];
     $: thresholds = Array.from({length: dimensions}, () => 0);
+    $: continousThresholds = Array.from({length: dimensions}, () => 0);
 
     function euclideanDistance(vector1: number[], vector2: number[]): number {
         let sum = 0;
@@ -47,11 +48,21 @@
             parser = (level: number[]): boolean => {
                 return level.length === parseInt(query);
             };
+        } else if (query.startsWith('>')) {
+            let subQuery = query.slice(1);
+            parser = (level: number[]): boolean => {
+                return level.length > parseInt(subQuery);
+            };
+        } else if (query.startsWith('<')) {
+            let subQuery = query.slice(1);
+            parser = (level: number[]): boolean => {
+                return level.length < parseInt(subQuery);
+            };
         };
         return parser
     };
 
-    function query(queryVector: string[]) {
+    function query(queryVector: string[], thresholds: number[]) {
         selectedIDs = trees
             .map((root, index) => {return {root: root, index: index}})
             .filter(object => {
@@ -77,7 +88,7 @@
             .map(object => object.index);
     }
 
-    $: query(queryVector);
+    $: query(queryVector, thresholds);
 </script>
 
 <div id='query-vector'>
@@ -93,14 +104,22 @@
                 {:else}
                     <span>Level {i}</span>
                 {/if}
-                <input class='query-dimension' bind:value={queryVector[i]} />
-                <input type='range' bind:value={thresholds[i]} min=0 max=0.5 step=0.01/>
-                <span>{thresholds[i]}</span>
+                <input class='query-dimension' value={queryVector[i]} on:keydown={(e) => {if (e.key === 'Enter') queryVector[i] = e.target.value}} />
+                <input type='range' bind:value={continousThresholds[i]} min=0 max=0.5 step=0.01 on:change={(e) => thresholds[i] = e.target.valueAsNumber} />
+                <span>{continousThresholds[i]}</span>
             </div>
         {/each}
     </div>
-    <!-- <button id='query-button' on:click={query(queryVector)}>Query</button> -->
-    <button id='query-button' on:click={() => queryVector = queryVector.map(_ => '*')}>Clear</button>
+    <button 
+        id='query-button' 
+        on:click={() => {
+            queryVector = queryVector.map(_ => '*'); 
+            thresholds = thresholds.map(_ => 0);
+            continousThresholds = continousThresholds.map(_ => 0);
+        }}
+    >
+        Clear
+    </button>
 </div>
 
 <style>
