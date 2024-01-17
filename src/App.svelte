@@ -10,6 +10,7 @@
     import SearchBar from "./lib/SearchBar.svelte";
     import type { HierarchyNode } from "d3-hierarchy";
     import { createHierarchy, extractD3HierarchyRoot } from "./lib/hierarchyUtils";
+    import { schemeSet1, schemeSet3 } from 'd3-scale-chromatic';
 
     type Dataset = {
         name: string,
@@ -23,6 +24,7 @@
     ];
     let dataset = datasets[0];
 
+    const colorPalette = [...schemeSet1.slice(0, -1), ...schemeSet3];
     
     let datasetLabels = [] as string[][];
     let embeddings = [] as Embedding[];
@@ -31,7 +33,7 @@
     let predictions = [] as string[][];
     let jointEntropy = new Map<string, number>();
     let trees = [] as HierarchyNode<Node>[];
-    let levelIDMap = new Map<number, number>();
+    let colorMap = new Map<number, string>();
 
     let selectedIDs = [] as number[];
     let instances = [] as string[];
@@ -63,7 +65,10 @@
             
             let hierarchyD3: HierarchyNode<Node>[] = extractD3HierarchyRoot(hierarchy).descendants();
             hierarchyD3.sort((a, b) => a.data.name.localeCompare(b.data.name)).sort((a, b) => a.depth - b.depth);
-            levelIDMap = new Map(hierarchyD3.map((node, index) => [node.data.id, index]));
+            let levelIDMap = new Map(hierarchyD3.map((node, index) => [node.data.id, index]));
+            colorMap = hierarchy.reduce((acc: Map<number, string>, node: Node) => 
+                acc.set(node.id, colorPalette[levelIDMap.get(node.id)! % colorPalette.length]), new Map<number, string>);
+    
        });
     };
 
@@ -112,7 +117,7 @@
                 hierarchy={hierarchy}
                 scores={scores}
                 trees={trees}
-                levelIDMap={levelIDMap}
+                colorMap={colorMap}
             />
         </div>
         <div id='embeddings'>
@@ -120,7 +125,7 @@
             <QueryBar trees={trees} bind:selectedIDs={selectedIDs}/>
             <Filter labels={datasetLabels} predictions={predictions} bind:selectedIDs={selectedIDs}/>
             <ProjectionPlot embeddings={embeddings} bind:selectedIDs={selectedIDs}/>
-            <ConfusionList jointEntropy={jointEntropy} hierarchy={hierarchy}/>
+            <ConfusionList jointEntropy={jointEntropy} hierarchy={hierarchy} colorMap={colorMap}/>
         </div>
         </div>
     </div>

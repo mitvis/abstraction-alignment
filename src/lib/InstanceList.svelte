@@ -13,7 +13,7 @@
     export let hierarchy = [] as Node[];
     export let scores = [] as Score[];
     export let trees = [] as HierarchyNode<Node>[];
-    export let levelIDMap = new Map<number, number>();
+    export let colorMap = new Map<number, string>();
 
     // Update the height of the instance container when the hierarchy loads
     let instanceContainers: any[] = [];
@@ -36,7 +36,7 @@
                             hierarchy={hierarchy}
                             scores={scores[id]}
                             root={trees[id]}
-                            levelIDMap={levelIDMap}
+                            colorMap={colorMap}
                             on:loaded={() => {updateHeight(i)}}
                         />
                     </div>

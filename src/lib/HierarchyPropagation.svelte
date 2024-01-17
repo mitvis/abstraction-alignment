@@ -4,19 +4,17 @@
     import * as d3 from 'd3';
     import type { HierarchyNode } from "d3-hierarchy";
     import { createEventDispatcher, onMount } from "svelte";
-    import { depthFirstItemization, isAncestor, findParent } from "./hierarchyUtils";
-    import { schemeSet1, schemeSet3 } from 'd3-scale-chromatic';
+    import { depthFirstItemization, isAncestor, findParent, shortenName } from "./hierarchyUtils";
 
     export let hierarchy: Node[];
     export let scores: Score;
     export let root: HierarchyNode<Node>;
-    export let levelIDMap: Map<number, number>;
     export let width = 500; // width of the SVG
     export let maxStringChars = 18;
     export let collapseDepth = 3;
+    export let colorMap = new Map<number, string>();
     
     const dispatch = createEventDispatcher();
-    const colorPalette = [...schemeSet1.slice(0, -1), ...schemeSet3];
 
     let selectedRoot: HierarchyNode<Node>;
     let visualizationAttributes: VisualizationAttributes = {};
@@ -32,15 +30,6 @@
     onMount(() => {
         dispatch('loaded');
     });
-
-    // Create a mapping to color each node
-    let colorMap = new Map<number, string>();
-    // let colorIDMap = new Map<number, number>(); // maps node IDs to their color index (depth order)
-
-    $: if (hierarchy) {
-        colorMap = hierarchy.reduce((acc: Map<number, string>, node: Node) => 
-            acc.set(node.id, colorPalette[levelIDMap.get(node.id)! % colorPalette.length]), new Map<number, string>);
-    }
 
     // Select the nodes to color based on the selected root
     let colorNodes: {[key: number]: [number, HierarchyNode<Node>]} = {};
