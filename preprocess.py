@@ -137,7 +137,7 @@ class Tree:
 
 
         
-def compute_joint_entropy(hierarchy, scores, threshold, num_decimals):
+def compute_joint_entropy(hierarchy, scores, threshold):
     joint_entropy = {}
     tree = Tree(hierarchy)
     for i, instance_scores in enumerate(scores):
@@ -151,7 +151,7 @@ def compute_joint_entropy(hierarchy, scores, threshold, num_decimals):
             key = f'{node_a},{node_b}'
             joint_entropy.setdefault(key, 0)
             entropy_value = entropy([tree.nodes[node_a].value, tree.nodes[node_b].value])
-            joint_entropy[key] += round(entropy_value, num_decimals)
+            joint_entropy[key] += round(entropy_value, 5)
         
         end_time = time.time()
         elapsed_time = int(end_time - start_time)
@@ -159,22 +159,43 @@ def compute_joint_entropy(hierarchy, scores, threshold, num_decimals):
     return joint_entropy
 
 
-def parallel_compute_joint_entropy(hierarchy, scores, threshold, num_decimals, num_cores=None):
-    joint_entropy = {}
+def compute_joint_occurrence(hierarchy, scores, threshold):
+    joint_occurrence = {}
+    tree = Tree(hierarchy)
+    for i, instance_scores in enumerate(scores):
+        start_time = time.time()
+        tree.propagate(instance_scores)
+        for node_a, node_b in combinations(tree.nodes, 2):
+            node_a = int(node_a)
+            node_b = int(node_b)
+            if tree.nodes[node_a].value <= threshold or tree.nodes[node_b].value <= threshold:
+                continue
+            key = f'{node_a},{node_b}'
+            joint_occurrence.setdefault(key, 0)
+            joint_occurrence[key] += 1
+        
+        end_time = time.time()
+        elapsed_time = int(end_time - start_time)
+        print(f'..processed {i} instances in {elapsed_time} seconds. Estimated time remaining: {elapsed_time * (len(scores) - i)} seconds.')
+    return joint_occurrence
+
+
+def parallel_compute(function, hierarchy, scores, threshold, num_cores=None):
+    result = {}
     if num_cores is None:
         num_cores = cpu_count()
-    print(f"Computing joint entropy on {num_cores} cores doing {int(len(scores)/num_cores)} instances each...")
+    print(f"Computing {function.__name__} on {num_cores} cores doing {int(len(scores)/num_cores)} instances each...")
     
-    args = [(hierarchy, chunk_scores, threshold, num_decimals) for chunk_scores in np.array_split(scores, num_cores)]
+    args = [(hierarchy, chunk_scores, threshold) for chunk_scores in np.array_split(scores, num_cores)]
     with Pool(num_cores) as pool:
-        results = pool.starmap(compute_joint_entropy, args)
+        results = pool.starmap(function, args)
     
     for partial_joint_entropy in results:
         for key, value in partial_joint_entropy.items():
-            joint_entropy.setdefault(key, 0)
-            joint_entropy[key] += value
+            result.setdefault(key, 0)
+            result[key] += value
 
-    return joint_entropy
+    return result
 
 def load_json(filename):
     """
@@ -203,7 +224,7 @@ def write_json(filename, data):
     with open(filename, 'w') as f:
         return json.dump(data, f, indent=4)
 
-def process_dataset(dataset_directory, threshold, num_decimals, num_cores):
+def process_dataset(dataset_directory, threshold, num_cores):
     """
     Process a dataset by computing the joint entropy of its hierarchy of nodes.
 
@@ -215,30 +236,52 @@ def process_dataset(dataset_directory, threshold, num_decimals, num_cores):
     """
     hierarchy = load_json(os.path.join(dataset_directory, 'hierarchy.json'))
     scores = load_json(os.path.join(dataset_directory, 'scores.json'))
-    joint_entropy = parallel_compute_joint_entropy(hierarchy, scores, threshold, num_decimals=num_decimals, num_cores=num_cores)
-    write_json(os.path.join(dataset_directory, 'joint_entropy.json'), joint_entropy)
+    labels = load_json(os.path.join(dataset_directory, 'labels.json'))
+
+    # Format labels like scores to use for label <--> hierarchy alignment
+    name_to_id = {node['name']: node['id'] for node in hierarchy}
+    label_scores = [{name_to_id[node_name]: 1 for node_name in instance_labels} for instance_labels in labels]
+
+    joint_entropy_path = os.path.join(dataset_directory, 'joint_entropy.json')
+    if not os.path.isfile(joint_entropy_path):
+        joint_entropy = parallel_compute(compute_joint_entropy, hierarchy, scores, threshold, num_cores=num_cores)
+        write_json(joint_entropy_path, joint_entropy)
+    
+    joint_occurrence_path = os.path.join(dataset_directory, 'joint_occurrence.json')
+    if not os.path.isfile(joint_occurrence_path):
+        joint_occurrence = parallel_compute(compute_joint_occurrence, hierarchy, scores, threshold, num_cores=num_cores)
+        write_json(joint_occurrence_path, joint_occurrence)
+
+    joint_entropy_labels_path = os.path.join(dataset_directory, 'joint_entropy_labels.json')
+    if not os.path.isfile(joint_entropy_labels_path):
+        joint_entropy_labels = parallel_compute(compute_joint_entropy, hierarchy, label_scores, 0, num_cores=num_cores)
+        write_json(joint_entropy_labels_path, joint_entropy_labels)
+
+    joint_occurrence_labels_path = os.path.join(dataset_directory, 'joint_occurrence_labels.json')
+    if not os.path.isfile(joint_occurrence_labels_path):
+        joint_occurrence_labels = parallel_compute(compute_joint_occurrence, hierarchy, label_scores, 0, num_cores=num_cores)
+        write_json(joint_occurrence_labels_path, joint_occurrence_labels)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process a dataset by computing the joint entropy of its hierarchy of nodes.')
     parser.add_argument('--data_directory', type=str, default='data/', help='The directory containing the data.')
-    parser.add_argument('--num_decimals', type=int, default=5, help='The number of decimal places to round the entropy values to.')
     parser.add_argument('--num_cores', type=int, default=None, help='The number of cores to use for parallel computation.')
-
+    parser.add_argument('--threshold', type=float, default=None, help='The threshold to consider probabilities at.')
     args = parser.parse_args()
 
     for folder in os.listdir(args.data_directory):
         dataset_directory = os.path.join(args.data_directory, folder)
         if not os.path.isdir(dataset_directory):
             continue
-        if os.path.isfile(os.path.join(dataset_directory, 'joint_entropy.json')):
+
+        if folder not in ['cifar', 'mimic']:
             continue
         
-        if folder == 'cifar':
-            threshold = 0.01
-        elif folder == 'mimic': 
-            threshold = 0.5
-        else:
-            continue
+        if args.threshold is None:
+            if folder == 'cifar': args.threshold = 0.01
+            if folder == 'mimic': args.threshold = 0.5
+
         print(f'Processing {folder}...')
-        process_dataset(dataset_directory, threshold, args.num_decimals, args.num_cores)
+        process_dataset(dataset_directory, args.threshold, args.num_cores)
+        print(f'{folder} complete.')

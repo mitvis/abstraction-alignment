@@ -7,8 +7,8 @@
     }
 
     export let options: Option = {
-        'nodeA': ['height', 'depth', 'name'],
-        'nodeB': ['height', 'depth', 'name'],
+        'nodeA': ['height', 'depth', 'name', 'isLabel'],
+        'nodeB': ['height', 'depth', 'name', 'isLabel'],
         'pair': ['connected', 'shareParent']
     }
     export let filters: Filter[] = [];

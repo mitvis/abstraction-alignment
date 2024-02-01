@@ -10,16 +10,19 @@
     export let numConfusions: number = 50;
     export let jointEntropy = new Map<string, number>();
     export let hierarchy = [] as Node[];
-    export let colorMap = new Map<number, string>();
+    export let trees = [] as HierarchyNode<Node>[];
+    export let colorMap = new Map<string, string>();
+    export let selectedIDs: number[];
     export let numInstances: number = 0;
     $: max2DEntropy = computeEntropy([0.5,0.5]) * numInstances;
 
     let root: HierarchyNode<Node>;
-    let nodes: [number, number][] = [];
-    let selectedNodes: [number, number][] = [];
-    let idToNode = new Map<number, HierarchyNode<Node>>();
+    let nodes: [string, string][] = [];
+    let selectedNodes: [string, string][] = [];
+    let idToNode = new Map<string, HierarchyNode<Node>>();
+    let treeNodes = [] as Map<string, number>[];
 
-    const maxStringChars = 18;
+    const maxStringChars = 30;
     
     let filters: Filter[] = [];
 
@@ -30,36 +33,48 @@
             hierarchy.filter(node => node.parent === d.id)
         );
         idToNode = new Map(root.descendants().map(node => {
-            return [node.data.id, node]
+            return [node.data.id.toString(), node]
         }));
         nodes = Array.from(jointEntropy.keys()).map(key => {
             const [key1, key2] = key.split(',');
-            return [parseInt(key1), parseInt(key2)] as [number, number];
+            return [key1, key2] as [string, string];
         }).sort((a, b) => {
             const aKey = a[0] + ',' + a[1];
             const bKey = b[0] + ',' + b[1];
             return getItem(bKey, jointEntropy) - getItem(aKey, jointEntropy);
         });
         selectedNodes = [...nodes];
+        treeNodes = trees.map(root =>
+            new Map(root.descendants().map(node => {
+                return [node.data.name, node.data.value]
+            }))
+        );
     }
 
     function getItem(key: string | number, map: Map<string | number, any>) {
         const item = map.get(key);
-        if (!item) { throw new Error('Item not found in map.');}
+        if (!item) { 
+            console.log('KEY', key, 'MAP', map, 'KEYS', map.keys(), 'ITEM', item);
+            throw new Error('Item not found in map.');
+        }
         return item;
     }
 
     $: if (filters) {
-        selectedNodes = nodes.filter(pair => combineFilters()(pair));
+        selectedNodes = nodes.filter((pair, i) => combineFilters()(pair));
     }
 
-    let filterFunctions = {
+    let filterFunctions: {[key: string]: any} = {
+        'height': (node: HierarchyNode<Node>) => node.height,
+        'depth': (node: HierarchyNode<Node>) => node.depth,
+        'name': (node: HierarchyNode<Node>) => node.data.name,
         'connected': connected,
-        'shareParent': shareParent
+        'shareParent': shareParent,
+        'isLabel': isLabel,
     }
 
     function combineFilters() {
-        let combinedFilter = (pair: [number, number]) => {
+        let combinedFilter = (pair: [string, string]) => {
             const [id1, id2] = pair;
             const node1 = getItem(id1, idToNode);
             const node2 = getItem(id2, idToNode);
@@ -81,23 +96,28 @@
         return combinedFilter
     }
 
-    function connected(pair: [number, number]) {
+    function connected(pair: [string, string]) {
         const [id1, id2] = pair;
         const node1 = getItem(id1, idToNode);
         const node2 = getItem(id2, idToNode);
         return isConnected(node1, node2);
     }
 
-    function shareParent(pair: [number, number]) {
+    function shareParent(pair: [string, string]) {
         const [id1, id2] = pair;
         const node1 = getItem(id1, idToNode);
         const node2 = getItem(id2, idToNode);
         return node1.parent == node2.parent;
     }
 
+    function isLabel(node: HierarchyNode<Node>) {
+        return node.parent !== null && !node.data.name.includes('-')
+    }
+
     function applyNodeFilters(node: HierarchyNode<Node>, filters: Filter[]) {
         for (let filter of filters) {
-            let expression = node[filter.attribute] + ' ' + filter.operator + ' ' + filter.value;
+            let functionOutput = filterFunctions[filter.attribute](node);
+            let expression = functionOutput + ' ' + filter.operator + ' ' + filter.value;
             if (!evalExpression(expression)) {
                 return false;
             }
@@ -105,7 +125,7 @@
         return true;
     }
 
-    function applyPairFilters(pair: [number, number], filters: Filter[]) {
+    function applyPairFilters(pair: [string, string], filters: Filter[]) {
         for (let filter of filters) {
             let functionOutput = filterFunctions[filter.attribute](pair);
             let expression = functionOutput + ' ' + filter.operator + ' ' + filter.value;
@@ -116,12 +136,27 @@
         return true;
     }
 
+    function instanceFitsPair(pair: [string, string], treeNodes: Map<string, number>[]) {
+        const [id1, id2] = pair;
+        selectedIDs = treeNodes
+            .map((tree, i) => [tree, i])
+            .filter(item => {
+                return item[0].has(id1) && item[0].has(id2);
+            })
+            .map(item => item[1]);
+    }
 
-    function evalExpression(expression) {
+    function parseValue(value: string) {
+        if (value.toLowerCase() == 'true') { return true};
+        if (value.toLowerCase() == 'false') { return false};
+        return parseFloat(value);
+    }
+
+    function evalExpression(expression: string) {
         let [left, operator, right] = expression.split(' ');
 
-        left = parseFloat(left);
-        right = parseFloat(right);
+        left = parseValue(left);
+        right = parseValue(right);
 
         switch (operator) {
             case '>':
@@ -148,6 +183,14 @@
         return percentEntropy.toFixed(2);
     }
 
+    function getColor(id: number) {
+        let node = getItem(id, idToNode);
+        if (node.height == 0) {
+            node = node.parent
+        }
+        return colorMap.get(node.data.name);
+    }
+
 </script>
 
 <div id='confusions'>
@@ -159,11 +202,20 @@
     <div class='confusion-results'>
         {#if selectedNodes.length > 0}
             {#each selectedNodes.slice(0, numConfusions) as pair}
-                <div class='confusion-result'>
-                    <span style='background-color:{colorMap.get(pair[0])}'>
+                <div 
+                    class='confusion-result'
+                    on:click={() => {instanceFitsPair(pair, treeNodes)}}
+                >
+                    <span 
+                        style='background-color:{getColor(pair[0])}'
+                        title={getItem(pair[0], idToNode).data.name}
+                    >
                         {shortenName(getItem(pair[0], idToNode).data.name, maxStringChars)}
                     </span>
-                    <span style='background-color:{colorMap.get(pair[1])}'>
+                    <span 
+                        style='background-color:{getColor(pair[1])}'
+                        title={getItem(pair[1], idToNode).data.name}
+                    >
                         {shortenName(getItem(pair[1], idToNode).data.name, maxStringChars)}
                     </span>
                     <span style='width: 2.5em;'>{parseEntropy(pair)}</span>
@@ -211,7 +263,7 @@
         background-color: lightgrey;
         margin: 0;
         white-space: nowrap;
-        width: 10.5em;
+        width: 18em;
         font-family: Roboto-Mono, monospace;
         /* font-weight: 700; */
     }

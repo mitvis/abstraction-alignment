@@ -13,7 +13,7 @@
     export let hierarchy = [] as Node[];
     export let scores = [] as Score[];
     export let trees = [] as HierarchyNode<Node>[];
-    export let colorMap = new Map<number, string>();
+    export let colorMap = new Map<string, string>();
 
     // Update the height of the instance container when the hierarchy loads
     let instanceContainers: any[] = [];

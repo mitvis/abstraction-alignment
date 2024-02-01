@@ -12,7 +12,7 @@
     export let width = 500; // width of the SVG
     export let maxStringChars = 18;
     export let collapseDepth = 3;
-    export let colorMap = new Map<number, string>();
+    export let colorMap = new Map<string, string>();
     
     const dispatch = createEventDispatcher();
 
@@ -168,7 +168,7 @@
         if (node && node.depth > root.depth + 1) {
             node = findParent(node, root.depth + 1);
         }
-        const color = colorMap.get(node.data.id);
+        const color = colorMap.get(node.data.name);
         return color;
     }
 

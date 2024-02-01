@@ -6,14 +6,16 @@
     export let selectedIDs: number[];
     export let trees: HierarchyNode<Node>[];
 
-    $: dimensions = trees && trees.length > 0 ? trees[0].height + 1: 0;
-
-    let queryVector: string[];
+    let dimensions = 0;
+    $: if (trees && trees.length > 0) {
+        const maxHeight = trees.reduce((acc, tree) => tree.height > acc ? acc = tree.height : acc = acc, 0);
+        dimensions = maxHeight + 1;
+    }
+    let queryVector: string[] = [];
     $: queryVector = Array.from({length: dimensions}, () => '*');
 
-    let thresholds: number[];
+    let thresholds: number[] = [];
     $: thresholds = Array.from({length: dimensions}, () => 0);
-    $: continousThresholds = Array.from({length: dimensions}, () => 0);
 
     function euclideanDistance(vector1: number[], vector2: number[]): number {
         let sum = 0;
@@ -88,7 +90,9 @@
             .map(object => object.index);
     }
 
-    $: query(queryVector, thresholds);
+    $: if (queryVector.length > 0 && thresholds.length > 0) {
+        query(queryVector, thresholds);
+    }
 </script>
 
 <div id='query-vector'>
@@ -105,8 +109,6 @@
                     <span>Level {i}</span>
                 {/if}
                 <input class='query-dimension' value={queryVector[i]} on:keydown={(e) => {if (e.key === 'Enter') queryVector[i] = e.target.value}} />
-                <input type='range' bind:value={continousThresholds[i]} min=0 max=0.5 step=0.01 on:change={(e) => thresholds[i] = e.target.valueAsNumber} />
-                <span>{continousThresholds[i]}</span>
             </div>
         {/each}
     </div>
@@ -115,7 +117,6 @@
         on:click={() => {
             queryVector = queryVector.map(_ => '*'); 
             thresholds = thresholds.map(_ => 0);
-            continousThresholds = continousThresholds.map(_ => 0);
         }}
     >
         Clear
