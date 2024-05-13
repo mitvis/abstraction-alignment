@@ -45,11 +45,15 @@ def propagate(outputs, tree):
     
     return tree
 
-def show(tree):
+def show(tree, hide_zeros=True):
     string = tree.show(stdout=False)
     for node_id, node in tree.nodes.items():
         node_value = node.data
-        if node_value is not None and node_value >= 0.01:
-            node_value = f'{node_value:.2f}'
+        if node_value is not None:
+            node_value = round(node_value, 2)
+            if node_value == 0 and hide_zeros:
+                node_value = ''
+            else:
+                node_value = f'{node_value:.2f}'
         string = string.replace(f'{node_id}\n', f'{node_id} ({node_value})\n')
     return string
