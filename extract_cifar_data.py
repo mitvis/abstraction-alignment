@@ -93,9 +93,15 @@ def main(model_path, data_dir):
         tree = propagate(outputs[i], make_tree())
         fitted_abstractions.append(tree)
     joint_entropy = metrics.joint_entropy(fitted_abstractions, 0.00001)
-    print(f'{len(joint_entropy)} node pairs with confusion.')               
+    joint_entropy_ids = {}
+    for pair, value in joint_entropy.items():
+        node_a, node_b = pair.split(',')
+        node_a_id = name_to_id[node_a]
+        node_b_id = name_to_id[node_b]
+        joint_entropy_ids[f'{node_a_id},{node_b_id}'] = value
+    print(f'{len(joint_entropy_ids)} node pairs with confusion.')               
     with open(os.path.join(output_dir, f"joint_entropy.json"), 'w') as f:
-        json.dump(joint_entropy, f, indent=4)  
+        json.dump(joint_entropy_ids, f, indent=4)  
 
 
 if __name__ == '__main__':
