@@ -13,7 +13,8 @@ import cifar_util
 import util
 
 
-def train(architecture, batch_size, epochs, dataset_directory, model_directory, seed=None):
+def train(architecture, batch_size, epochs, dataset_directory, model_directory, data_augmentation, seed=None):
+    """Train a PyTorch model to classify CIFAR-100 images.."""
     if seed is not None:
         print(f'Setting seed: {seed}.')
         torch.manual_seed(seed)
@@ -21,7 +22,7 @@ def train(architecture, batch_size, epochs, dataset_directory, model_directory, 
             torch.cuda.manual_seed(seed)
     
     # Load dataset
-    train_loader, test_loader = cifar_util.load_dataset(dataset_directory, True, batch_size)
+    train_loader, test_loader = cifar_util.load_dataset(dataset_directory, data_augmentation, batch_size)
     print(f'Loaded CIFAR-100: {len(train_loader.dataset)} train and {len(test_loader.dataset)} test instances.')
     
     # Load model

@@ -1,5 +1,6 @@
 """Create hierarchy for CIFAR-100 dataset."""
 
+import re
 import numpy as np
 from treelib import Tree
 
@@ -52,8 +53,19 @@ def show(tree, hide_zeros=True):
         if node_value is not None:
             node_value = round(node_value, 2)
             if node_value == 0 and hide_zeros:
-                node_value = ''
+                string = re.sub(rf"\n.*{node_id}\n", '\n', string)
             else:
                 node_value = f'{node_value:.2f}'
-        string = string.replace(f'{node_id}\n', f'{node_id} ({node_value})\n')
+                string = string.replace(f'{node_id}\n', f'{node_id} ({node_value})\n')
     return string
+
+def serialize_tree(tree):
+    output = []
+    node_ids = {node.identifier: i for i, node in enumerate(tree.all_nodes())}
+    for i, node in enumerate(tree.all_nodes()):
+        json_object = {'id': node_ids[node.identifier], 'name': node.identifier}
+        if tree.parent(node.identifier) is not None:
+            json_object['parent'] = node_ids[tree.parent(node.identifier).identifier]
+        output.append(json_object)
+    return output
+
