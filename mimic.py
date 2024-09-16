@@ -138,3 +138,13 @@ def propagate(labels, tree):
         level -= 1
 
     return tree
+
+def serialize_tree(tree):
+    output = []
+    node_ids = {node.identifier: i for i, node in enumerate(tree.all_nodes())}
+    for i, node in enumerate(tree.all_nodes()):
+        json_object = {'id': node_ids[node.identifier], 'name': node.identifier}
+        if tree.parent(node.identifier) is not None:
+            json_object['parent'] = node_ids[tree.parent(node.identifier).identifier]
+        output.append(json_object)
+    return output
