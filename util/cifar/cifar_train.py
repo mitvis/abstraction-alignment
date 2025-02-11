@@ -1,16 +1,13 @@
 """Trains model on CIFAR-100 and writes checkpoint to disk."""
 
 import os
-from tqdm import tqdm
-
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn as nn
+from tqdm import tqdm
+import torch.backends.cudnn as cudnn
 from torch.optim.lr_scheduler import MultiStepLR
 
-import cifar
-import cifar_util
-import util
+import util.cifar.cifar_util as cifar_util
 
 
 def train(architecture, batch_size, epochs, dataset_directory, model_directory, data_augmentation, seed=None):
@@ -39,33 +36,23 @@ def train(architecture, batch_size, epochs, dataset_directory, model_directory, 
                             momentum=0.9, nesterov=True,
                             weight_decay=5e-4)
     scheduler = MultiStepLR(optimizer, milestones=[60, 120, 160], gamma=0.2)
-    
-    # Initialize log
-    log_path = util.get_log_path(model_path)
-    util.create_directory(os.path.dirname(log_path))
-    csv_logger = util.CSVLogger(
-        fieldnames=['epoch', 'train_acc', 'test_acc', 'train_loss'],
-        filepath=log_path,
-    )
 
     # Train model
     print(f'Training {architecture} for {epochs} epochs.')
     for epoch in range(epochs):
         train_epoch(epoch, model, train_loader, test_loader, criterion,
-                   optimizer, scheduler, csv_logger)
+                   optimizer, scheduler)
 
     # Save model checkpoint.
-    checkpoint_path = util.get_checkpoint_path(model_path)
-    util.create_directory(os.path.dirname(checkpoint_path))
+    checkpoint_path = cifar_util.get_checkpoint_path(model_path)
+    cifar_util.create_directory(os.path.dirname(checkpoint_path))
     torch.save(model.state_dict(), checkpoint_path)
-
-    # Close logger and SummaryWriter.
-    csv_logger.close()
     
     return model
 
 
 def test(model, test_loader):
+    """Tests the model on the test_loader data and return accuracy."""
     model.eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     correct = 0.
@@ -87,7 +74,8 @@ def test(model, test_loader):
 
 
 def train_epoch(epoch, model, train_loader, test_loader, criterion, 
-                optimizer, scheduler, logger):
+                optimizer, scheduler):
+    """Trains the model for one epoch on the data in the train_loader."""
     model.train()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     loss_avg = 0.
@@ -125,12 +113,3 @@ def train_epoch(epoch, model, train_loader, test_loader, criterion,
     tqdm.write('test_acc: %.3f' % (test_acc))
 
     scheduler.step()
-
-    row = {
-        'epoch': str(epoch),
-        'train_acc': str(accuracy),
-        'test_acc': str(test_acc),
-        'train_loss': str(loss_avg / (i + 1))
-    }
-
-    logger.writerow(row)

@@ -34,8 +34,9 @@ def parse_code(code):
     return prefix, (start, start_prefix, start_suffix), (end, end_prefix, end_suffix)
 
 
-def make_tree(icd9_file):
-    tree = Tree()
+def make_abstraction_graph(icd9_file):
+    """Creates the ICD-9 human abstraction graph."""
+    abstraction_graph = Tree()
     
     # Get the ICD-9 codes from the MIMIC-III dataset
     with open(icd9_file, 'r') as f:
@@ -81,7 +82,7 @@ def make_tree(icd9_file):
             else:
                 child_to_parent[code] = '@'
     
-    # Create the tree
+    # Create the abstraction_graph
     parent_to_children = {}
     for child, parent in child_to_parent.items():
         if parent is not None:
@@ -92,7 +93,7 @@ def make_tree(icd9_file):
     i = 0
     while not q.empty():
         code = q.get()
-        tree.create_node(
+        abstraction_graph.create_node(
             tag=code_map[code], 
             identifier=code, 
             parent=child_to_parent[code],
@@ -101,11 +102,12 @@ def make_tree(icd9_file):
         if code in parent_to_children:
             for child in sorted(parent_to_children[code]):
                 q.put(child)
-    return tree
+    return abstraction_graph
 
-def show(tree, hide_zeros=True):
-    string = tree.show(stdout=False, key=lambda n: n.identifier)
-    for node_id, node in tree.nodes.items():
+def show_abstraction_graph(abstraction_graph, hide_zeros=True):
+    """Displays the abstraction_graph."""
+    string = abstraction_graph.show(stdout=False, key=lambda n: n.identifier)
+    for node_id, node in abstraction_graph.nodes.items():
         node_value = node.data
         if node_value is not None:
             node_value = round(node_value, 2)
@@ -117,34 +119,36 @@ def show(tree, hide_zeros=True):
     return string
 
 
-def propagate(labels, tree):
+def propagate(labels, abstraction_graph):
+    """Propagates values through the abstraction_graph."""
     # Set all nodes to 0
-    for node in tree.all_nodes():
+    for node in abstraction_graph.all_nodes():
         node.data = 0
     
     # Overwrite the label nodes as 1
     for label in labels:
-        if tree.contains(label): # some labels are not in ICD hierarchy file
-            node = tree.get_node(label)
+        if abstraction_graph.contains(label): # some labels are not in ICD hierarchy file
+            node = abstraction_graph.get_node(label)
             node.data = 1
         
-    # Propagate values up the tree
-    level = tree.depth()
+    # Propagate values up the abstraction_graph
+    level = abstraction_graph.depth()
     while level >= 0:
-        nodes = tree.filter_nodes(lambda n: tree.depth(n) == level)
+        nodes = abstraction_graph.filter_nodes(lambda n: abstraction_graph.depth(n) == level)
         for node in nodes:
             if not node.is_leaf() and node.data == 0:
-                node.data = np.sum([child.data for child in tree.children(node.identifier)])
+                node.data = np.sum([child.data for child in abstraction_graph.children(node.identifier)])
         level -= 1
 
-    return tree
+    return abstraction_graph
 
-def serialize_tree(tree):
+def serialize_abstraction_graph(abstraction_graph):
+    """Serializes the abstraction_graph into JSON."""
     output = []
-    node_ids = {node.identifier: i for i, node in enumerate(tree.all_nodes())}
-    for i, node in enumerate(tree.all_nodes()):
-        json_object = {'id': node_ids[node.identifier], 'name': node.identifier}
-        if tree.parent(node.identifier) is not None:
-            json_object['parent'] = node_ids[tree.parent(node.identifier).identifier]
+    node_ids = {node.identifier: i for i, node in enumerate(abstraction_graph.all_nodes())}
+    for i, node in enumerate(abstraction_graph.all_nodes()):
+        json_object = {'id': node_ids[node.identifier], 'name': f'{node.identifier}: {node.tag}'}
+        if abstraction_graph.parent(node.identifier) is not None:
+            json_object['parent'] = node_ids[abstraction_graph.parent(node.identifier).identifier]
         output.append(json_object)
     return output

@@ -1,12 +1,16 @@
-"""Util for datasets and transforms."""
+"""Util for CIFAR examples."""
 
+import csv
+import json
+import os
 import numpy as np
-import resnet
 import torch
 import torchvision.models as models
 import torch.nn as nn
 from torchvision import transforms, datasets
 from matplotlib import pyplot as plt
+
+import util.cifar.resnet as resnet
 
 
 CIFAR_MEAN = np.array([125.3, 123.0, 113.9])
@@ -21,6 +25,7 @@ NUM_CLASSES = 100
 
 
 def load_model(architecture):
+    """Load a TorchVision model with the given architecture."""
     if architecture in ['resnet%i' %(i) for i in [20, 32, 44, 56, 110, 1202]]:
         model = resnet.__dict__[architecture](NUM_CLASSES)
     
@@ -44,6 +49,7 @@ def load_model(architecture):
 
 
 def load_dataset(dataset_directory, data_augmentation, batch_size):
+    """Loads the CIFAR-100 dataset and returns the train and test loaders."""
     train_transform = cifar_train_transform(data_augmentation)
     test_transform = cifar_test_transform()
 
@@ -72,6 +78,7 @@ def load_dataset(dataset_directory, data_augmentation, batch_size):
 
 
 def cifar_train_transform(data_augmentation):
+    """Data transforms for the CIFAR-100 training data."""
     train_transform = transforms.Compose([])
     if data_augmentation:
         train_transform.transforms.append(CIFAR_RANDOM_CROP)
@@ -82,6 +89,7 @@ def cifar_train_transform(data_augmentation):
 
 
 def cifar_test_transform():
+    """Data transforms for the CIFAR-100 test data."""
     test_transform = transforms.Compose([
         transforms.ToTensor(),
         CIFAR_NORMALIZE,
@@ -90,7 +98,7 @@ def cifar_test_transform():
 
 
 def unnorm_cifar_image(x):
-    # Unnormalize image by undoing mean/std normalization.
+    """Unnormalize image by undoing mean/std normalization."""
     # Image is kept in the range [0, 1].
     x_unnorm = x * (CIFAR_STD / 255.0) + (CIFAR_MEAN / 255.0)
     x_unnorm = np.clip(x_unnorm, 0, 1)
@@ -98,6 +106,7 @@ def unnorm_cifar_image(x):
 
 
 def transpose_channel_last(x):
+    """Trasposes the last channel in a batch of 2d or 3d images."""
     if isinstance(x, torch.Tensor):
         x = x.cpu().numpy()
     if len(x.shape) == 4:  # Includes batch dimension.
@@ -108,6 +117,7 @@ def transpose_channel_last(x):
 
 
 def plot_cifar_image(x, unnorm=False):
+    """Plots a CIFAR image."""
     if x.shape[0] == 3:  # Transpose channel last.
         x = transpose_channel_last(x)
     if unnorm:

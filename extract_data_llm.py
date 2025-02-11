@@ -13,9 +13,7 @@ from scipy import stats
 
 import metrics
 from nltk.corpus import wordnet as wn
-from tree import Tree, check_tree
-from node import Node, GraphNode
-from graph import Graph
+from graph import Graph, Node
 
 
 def load_task_data(task_id, data_dir):
@@ -78,7 +76,7 @@ def create_wordnet_dag(task, synsets):
         
         # Create a node for the synset if it does not already exit.
         if synset_name not in nodes:
-            synset_node = GraphNode(synset_name)
+            synset_node = Node(synset_name)
         else: 
             synset_node = nodes[synset_name]
             
@@ -87,7 +85,7 @@ def create_wordnet_dag(task, synsets):
             parent_node.connect_child(synset_node)
         nodes[synset_name] = synset_node
         
-        # Continue the traversal down the tree.
+        # Continue the traversal down the abstraction graph.
         traversal_fn = getattr(synset, task['down_fn'])
         for next_synset in traversal_fn():
             if get_synset_name(next_synset) not in task_synsets:
@@ -100,26 +98,25 @@ def create_wordnet_dag(task, synsets):
 
 
 def convert_dag_to_tree(dag, task, node_name_to_parent_name):
+    """Converts a Graph into a Tree."""
     # Create tree with blank versions of all nodes
     tree_nodes = {}
     for graph_node_name, graph_node in dag.nodes.items():
-        tree_nodes[graph_node_name] = Node(graph_node_name, value=0, parent=None)
+        tree_nodes[graph_node_name] = Node(graph_node_name, value=0, parents=[])
     print(f'Added {len(tree_nodes)}/{len(dag.nodes)} node to the tree.')
 
     # Connect the tree nodes by choosing the parent with the lowest depth
     for graph_node_name, graph_node in dag.nodes.items():
         node = tree_nodes[graph_node_name]
-        assert node.parent is None # Confirm the tree node has not already been assigned a parent.
+        assert len(node.parents) == 0 # Confirm the tree node has not already been assigned a parent.
         if len(graph_node.parents) == 0:
             continue # Skip the root node.
         if graph_node.name in node_name_to_parent_name:
             parent_node_name = node_name_to_parent_name[graph_node.name]
         elif len(graph_node.parents) == 1:
-            parent_node_name = graph_node.parents[0].name
+            parent_node_name = next(iter(graph_node.parents)).name
         else:
             raise ValueError(f"Node {graph_node.name} has multiple parents {graph_node.parents} and is not in node_name_to_parent_name.")
-        # parent_depths = [dag[parent.name].depth for parent in dag.parents]
-        # max_depth_graph_parent = dag.parents[np.argmax(parent_depths)]
         parent_node = tree_nodes[parent_node_name]
         parent_node.connect_child(node) 
 
@@ -131,12 +128,13 @@ def convert_dag_to_tree(dag, task, node_name_to_parent_name):
     print(f'Removed {len(tree_nodes) - len(connected_nodes)} unconnected nodes from the tree.')
     tree_nodes = tree_nodes
 
-    tree = Tree(tree_nodes, get_synset_name(task['root']))
+    tree = Graph(tree_nodes, get_synset_name(task['root']))
     tree.finalize()
     return tree
 
 
-def main(stest_dir, data_dir, results_dir, model, task):
+def main(case_study_dir, data_dir, results_dir, model, task):
+    """Create data files for the language model case study."""
     print(f"EXTRACTING DATA FOR {model} ON THE {task['name']} TASK.")
     
     # Load the S-TEST data for the task.
@@ -156,7 +154,7 @@ def main(stest_dir, data_dir, results_dir, model, task):
     
     # Load the labels and map them to their corresponding wordnet synset.
     all_labels = [data[result['sample']['sub_label']]['obj_label'] for result in results]
-    with open(os.path.join(stest_dir, f"{task['id']}_synsets.json"), 'r') as f:
+    with open(os.path.join(data_dir, f"{task['id']}_synsets.json"), 'r') as f:
         label_synsets = json.load(f)
         label_to_synset = {label: wn.synset(synset) for label, synset in label_synsets if synset is not None}
     idx_to_keep = [i for i in range(len(all_labels)) if all_labels[i] in label_to_synset]
@@ -172,22 +170,22 @@ def main(stest_dir, data_dir, results_dir, model, task):
     print(f"CREATED WORDNET DAG with root node '{wordnet_dag.root_id}' and {len(wordnet_dag.nodes)} synset concepts.")
     
     # Convert the DAG to a tree for visualization interface.
-    name_to_parent_filename = os.path.join(stest_dir, f"{task['id']}_concept_to_parent.json")
+    name_to_parent_filename = os.path.join(case_study_dir, f"{task['id']}_concept_to_parent.json")
     with open(name_to_parent_filename, 'r') as f:
         node_name_to_parent_name = json.load(f)
     print(f"Loaded node to parent mapping for {len(node_name_to_parent_name)} nodes.")
     wordnet_tree = convert_dag_to_tree(wordnet_dag, task, node_name_to_parent_name)
-    check_tree(wordnet_tree)
+    wordnet_tree.check_tree()
     print(f"CREATED WORDNET TREE for {task['name']} with {len(wordnet_tree.nodes)} nodes.")
     
     # Write out the tree files.
-    output_dir = 'wordnet/'
+    output_dir = 'interface/data/llm'
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         
     # Write out the wordnet tree.
     serialized_wordnet_tree = wordnet_tree.serialize(False)
-    with open(os.path.join(output_dir, 'hierarchy.json'), 'w') as f:
+    with open(os.path.join(output_dir, 'abstraction_graph.json'), 'w') as f:
         json.dump(serialized_wordnet_tree, f, indent=4)
         
     # Write out the labels for each instance.
@@ -225,20 +223,19 @@ def main(stest_dir, data_dir, results_dir, model, task):
     print(f"Got texts for {len(texts)} instances.")
     with open(os.path.join(output_dir, 'texts.json'), 'w') as f:
         json.dump(texts, f, indent=4)
-        
-        
-    # Compute the joint entropy of node concepts across all instances.
+            
+    # Compute the concept coconfusion of node concepts across all instances.
     node_pairs = list(combinations([node['name'] for node in serialized_wordnet_tree], 2))
-    joint_entropy = metrics.joint_entropy(model_outputs_per_instance, task['threshold'])
-    print(f'{len(joint_entropy)}/{len(node_pairs)} node pairs with confusion.')               
-    with open(os.path.join(output_dir, f"joint_entropy.json"), 'w') as f:
-        json.dump(joint_entropy, f, indent=4)   
+    coconfusion = metrics.concept_coconfusion(model_outputs_per_instance, task['threshold'])
+    print(f'{len(coconfusion)}/{len(node_pairs)} node pairs with confusion.')               
+    with open(os.path.join(output_dir, f"coconfusion.json"), 'w') as f:
+        json.dump(coconfusion, f, indent=4)   
 
 
 if __name__ == '__main__':
-    stest_dir = 'S-TEST'
-    data_dir = os.path.join(stest_dir, 'data/S-TEST/')
-    results_dir = os.path.join(stest_dir, 'output/results/')
+    case_study_dir = 'util/llm/'
+    data_dir = os.path.join(case_study_dir, 'S-TEST', 'data/S-TEST/')
+    results_dir = os.path.join(case_study_dir, 'S-TEST', 'output/results/')
     model = 'bert_base'
     task = {
         'name': 'occupation', 
@@ -248,4 +245,4 @@ if __name__ == '__main__':
         'root': wn.synset('person.n.01'), 
         'threshold': 0.01,
     }
-    main(stest_dir, data_dir, results_dir, model, task)
+    main(case_study_dir, data_dir, results_dir, model, task)
