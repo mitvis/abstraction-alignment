@@ -154,7 +154,7 @@ def main(case_study_dir, data_dir, results_dir, model, task):
     
     # Load the labels and map them to their corresponding wordnet synset.
     all_labels = [data[result['sample']['sub_label']]['obj_label'] for result in results]
-    with open(os.path.join(data_dir, f"{task['id']}_synsets.json"), 'r') as f:
+    with open(os.path.join(case_study_dir, f"{task['id']}_synsets.json"), 'r') as f:
         label_synsets = json.load(f)
         label_to_synset = {label: wn.synset(synset) for label, synset in label_synsets if synset is not None}
     idx_to_keep = [i for i in range(len(all_labels)) if all_labels[i] in label_to_synset]

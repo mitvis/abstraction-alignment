@@ -67,7 +67,10 @@ class Graph():
             json_object = {'id': node_ids[node.name], 'name': node.name}
             if include_values:
                 json_object['values'] = node.values
-            json_object['parents'] = [node_ids[parent.name] for parent in node.parents]
+            if len(node.parents) == 1:
+                json_object['parent'] = node_ids[node.parents.pop().name]
+            elif len(node.parents) > 1:
+                json_object['parents'] = [node_ids[parent.name] for parent in node.parents]
             output.append(json_object)
         return output
             
